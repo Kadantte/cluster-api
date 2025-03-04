@@ -28,6 +28,7 @@ import (
 	clusterctlv1 "sigs.k8s.io/cluster-api/cmd/clusterctl/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client/config"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/internal/test"
+	goproxytest "sigs.k8s.io/cluster-api/internal/goproxy/test"
 )
 
 func Test_gitLabRepository_newGitLabRepository(t *testing.T) {
@@ -48,15 +49,15 @@ func Test_gitLabRepository_newGitLabRepository(t *testing.T) {
 				variableClient: test.NewFakeVariableClient(),
 			},
 			want: &gitLabRepository{
-				providerConfig:        config.NewProvider("test", "https://gitlab.example.org/api/v4/projects/group%2Fproject/packages/generic/my-package/v1.0/path", clusterctlv1.CoreProviderType),
-				configVariablesClient: test.NewFakeVariableClient(),
-				httpClient:            http.DefaultClient,
-				host:                  "gitlab.example.org",
-				projectSlug:           "group%2Fproject",
-				packageName:           "my-package",
-				defaultVersion:        "v1.0",
-				rootPath:              ".",
-				componentsPath:        "path",
+				providerConfig:           config.NewProvider("test", "https://gitlab.example.org/api/v4/projects/group%2Fproject/packages/generic/my-package/v1.0/path", clusterctlv1.CoreProviderType),
+				configVariablesClient:    test.NewFakeVariableClient(),
+				authenticatingHTTPClient: http.DefaultClient,
+				host:                     "gitlab.example.org",
+				projectSlug:              "group%2Fproject",
+				packageName:              "my-package",
+				defaultVersion:           "v1.0",
+				rootPath:                 ".",
+				componentsPath:           "path",
 			},
 			wantedErr: "",
 		},
@@ -130,7 +131,7 @@ func Test_gitLabRepository_newGitLabRepository(t *testing.T) {
 			g := NewWithT(t)
 			resetCaches()
 
-			gitLab, err := NewGitLabRepository(tt.field.providerConfig, tt.field.variableClient)
+			gitLab, err := NewGitLabRepository(context.Background(), tt.field.providerConfig, tt.field.variableClient)
 			if tt.wantedErr != "" {
 				g.Expect(err).To(MatchError(tt.wantedErr))
 				return
@@ -152,8 +153,8 @@ func Test_gitLabRepository_getFile(t *testing.T) {
 	providerConfig := config.NewProvider("test", providerURL, clusterctlv1.CoreProviderType)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "GET")
-		if r.URL.RawPath == "/api/v4/projects/group%2Fproject/packages/generic/my-package/v0.4.1/file.yaml" {
+		goproxytest.HTTPTestMethod(t, r, "GET")
+		if r.URL.EscapedPath() == "/api/v4/projects/group%2Fproject/packages/generic/my-package/v0.4.1/file.yaml" {
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Header().Set("Content-Disposition", "attachment; filename=file.yaml")
 			fmt.Fprint(w, "content")
@@ -192,8 +193,8 @@ func Test_gitLabRepository_getFile(t *testing.T) {
 			g := NewWithT(t)
 			resetCaches()
 
-			gitLab, err := NewGitLabRepository(providerConfig, configVariablesClient)
-			gitLab.(*gitLabRepository).httpClient = client
+			gitLab, err := NewGitLabRepository(context.Background(), providerConfig, configVariablesClient)
+			gitLab.(*gitLabRepository).authenticatingHTTPClient = client
 			g.Expect(err).ToNot(HaveOccurred())
 
 			got, err := gitLab.GetFile(context.Background(), tt.version, tt.fileName)

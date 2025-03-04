@@ -24,21 +24,23 @@ import (
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client"
+	"sigs.k8s.io/cluster-api/cmd/clusterctl/cmd/internal/templates"
 )
 
 type upgradeApplyOptions struct {
-	kubeconfig                string
-	kubeconfigContext         string
-	contract                  string
-	coreProvider              string
-	bootstrapProviders        []string
-	controlPlaneProviders     []string
-	infrastructureProviders   []string
-	ipamProviders             []string
-	runtimeExtensionProviders []string
-	addonProviders            []string
-	waitProviders             bool
-	waitProviderTimeout       int
+	kubeconfig                       string
+	kubeconfigContext                string
+	contract                         string
+	coreProvider                     string
+	bootstrapProviders               []string
+	controlPlaneProviders            []string
+	infrastructureProviders          []string
+	ipamProviders                    []string
+	runtimeExtensionProviders        []string
+	addonProviders                   []string
+	waitProviders                    bool
+	waitProviderTimeout              int
+	enableCRDStorageVersionMigration bool
 }
 
 var ua = &upgradeApplyOptions{}
@@ -46,7 +48,7 @@ var ua = &upgradeApplyOptions{}
 var upgradeApplyCmd = &cobra.Command{
 	Use:   "apply",
 	Short: "Apply new versions of Cluster API core and providers in a management cluster",
-	Long: LongDesc(`
+	Long: templates.LongDesc(`
 		The upgrade apply command applies new versions of Cluster API providers as defined by clusterctl upgrade plan.
 
 		New version should be applied ensuring all the providers uses the same cluster API version
@@ -54,7 +56,7 @@ var upgradeApplyCmd = &cobra.Command{
 
  		Specifying the provider using namespace/name:version is deprecated and will be dropped in a future release.`),
 
-	Example: Examples(`
+	Example: templates.Examples(`
 		# Upgrades all the providers in the management cluster to the latest version available which is compliant
 		# to the v1alpha4 API Version of Cluster API (contract).
 		clusterctl upgrade apply --contract v1alpha4
@@ -62,7 +64,7 @@ var upgradeApplyCmd = &cobra.Command{
 		# Upgrades only the aws provider to the v2.0.1 version.
 		clusterctl upgrade apply --infrastructure aws:v2.0.1`),
 	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(*cobra.Command, []string) error {
 		return runUpgradeApply()
 	},
 }
@@ -93,6 +95,10 @@ func init() {
 		"Wait for providers to be upgraded.")
 	upgradeApplyCmd.Flags().IntVar(&ua.waitProviderTimeout, "wait-provider-timeout", 5*60,
 		"Wait timeout per provider upgrade in seconds. This value is ignored if --wait-providers is false")
+	upgradeApplyCmd.Flags().BoolVar(&ua.enableCRDStorageVersionMigration, "enable-crd-storage-version-migration", false,
+		"Enable CRD storage version migration")
+	_ = upgradeApplyCmd.Flags().MarkDeprecated("enable-crd-storage-version-migration",
+		"Storage version migration during upgrades has been deprecated and will be removed in Cluster API v1.13")
 }
 
 func runUpgradeApply() error {
@@ -119,16 +125,17 @@ func runUpgradeApply() error {
 	}
 
 	return c.ApplyUpgrade(ctx, client.ApplyUpgradeOptions{
-		Kubeconfig:                client.Kubeconfig{Path: ua.kubeconfig, Context: ua.kubeconfigContext},
-		Contract:                  ua.contract,
-		CoreProvider:              ua.coreProvider,
-		BootstrapProviders:        ua.bootstrapProviders,
-		ControlPlaneProviders:     ua.controlPlaneProviders,
-		InfrastructureProviders:   ua.infrastructureProviders,
-		IPAMProviders:             ua.ipamProviders,
-		RuntimeExtensionProviders: ua.runtimeExtensionProviders,
-		AddonProviders:            ua.addonProviders,
-		WaitProviders:             ua.waitProviders,
-		WaitProviderTimeout:       time.Duration(ua.waitProviderTimeout) * time.Second,
+		Kubeconfig:                       client.Kubeconfig{Path: ua.kubeconfig, Context: ua.kubeconfigContext},
+		Contract:                         ua.contract,
+		CoreProvider:                     ua.coreProvider,
+		BootstrapProviders:               ua.bootstrapProviders,
+		ControlPlaneProviders:            ua.controlPlaneProviders,
+		InfrastructureProviders:          ua.infrastructureProviders,
+		IPAMProviders:                    ua.ipamProviders,
+		RuntimeExtensionProviders:        ua.runtimeExtensionProviders,
+		AddonProviders:                   ua.addonProviders,
+		WaitProviders:                    ua.waitProviders,
+		WaitProviderTimeout:              time.Duration(ua.waitProviderTimeout) * time.Second,
+		EnableCRDStorageVersionMigration: ua.enableCRDStorageVersionMigration,
 	})
 }

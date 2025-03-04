@@ -21,9 +21,9 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubectl/pkg/util/templates"
 
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client"
+	"sigs.k8s.io/cluster-api/cmd/clusterctl/cmd/internal/templates"
 )
 
 // pauseOptions is the start of the data required to perform the operation.
@@ -58,7 +58,7 @@ func NewCmdRolloutPause(cfgFile string) *cobra.Command {
 		Short:                 "Pause a cluster-api resource",
 		Long:                  pauseLong,
 		Example:               pauseExample,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			return runPause(cfgFile, args)
 		},
 	}

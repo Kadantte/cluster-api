@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,8 +46,9 @@ import (
 
 // GetCAPIResourcesInput is the input for GetCAPIResources.
 type GetCAPIResourcesInput struct {
-	Lister    Lister
-	Namespace string
+	Lister       Lister
+	Namespace    string
+	IncludeTypes []metav1.TypeMeta
 }
 
 // GetCAPIResources reads all the CAPI resources in a namespace.
@@ -56,16 +59,20 @@ func GetCAPIResources(ctx context.Context, input GetCAPIResourcesInput) []*unstr
 	Expect(input.Namespace).NotTo(BeEmpty(), "input.Namespace is required for GetCAPIResources")
 
 	types := getClusterAPITypes(ctx, input.Lister)
+	types.Insert(input.IncludeTypes...)
 
 	objList := []*unstructured.Unstructured{}
-	for i := range types {
-		typeMeta := types[i]
+	for _, typ := range types.UnsortedList() {
 		typeList := new(unstructured.UnstructuredList)
-		typeList.SetAPIVersion(typeMeta.APIVersion)
-		typeList.SetKind(typeMeta.Kind)
+		typeList.SetAPIVersion(typ.APIVersion)
+		typeList.SetKind(typ.Kind)
 
 		if err := input.Lister.List(ctx, typeList, client.InNamespace(input.Namespace)); err != nil {
 			if apierrors.IsNotFound(err) {
+				continue
+			}
+			if apierrors.IsForbidden(err) {
+				fmt.Printf("Warning: failed to list %s resources due to a rbac issue: %v", typeList.GroupVersionKind(), err)
 				continue
 			}
 			Fail(fmt.Sprintf("failed to list %q resources: %v", typeList.GroupVersionKind(), err))
@@ -81,8 +88,8 @@ func GetCAPIResources(ctx context.Context, input GetCAPIResourcesInput) []*unstr
 
 // getClusterAPITypes returns the list of TypeMeta to be considered for the move discovery phase.
 // This list includes all the types belonging to CAPI providers.
-func getClusterAPITypes(ctx context.Context, lister Lister) []metav1.TypeMeta {
-	discoveredTypes := []metav1.TypeMeta{}
+func getClusterAPITypes(ctx context.Context, lister Lister) sets.Set[metav1.TypeMeta] {
+	discoveredTypes := sets.New[metav1.TypeMeta]()
 
 	crdList := &apiextensionsv1.CustomResourceDefinitionList{}
 	Eventually(func() error {
@@ -95,7 +102,7 @@ func getClusterAPITypes(ctx context.Context, lister Lister) []metav1.TypeMeta {
 				continue
 			}
 
-			discoveredTypes = append(discoveredTypes, metav1.TypeMeta{
+			discoveredTypes.Insert(metav1.TypeMeta{
 				Kind: crd.Spec.Names.Kind,
 				APIVersion: metav1.GroupVersion{
 					Group:   crd.Spec.Group,
@@ -109,9 +116,10 @@ func getClusterAPITypes(ctx context.Context, lister Lister) []metav1.TypeMeta {
 
 // DumpAllResourcesInput is the input for DumpAllResources.
 type DumpAllResourcesInput struct {
-	Lister    Lister
-	Namespace string
-	LogPath   string
+	Lister       Lister
+	Namespace    string
+	LogPath      string
+	IncludeTypes []metav1.TypeMeta
 }
 
 // DumpAllResources dumps Cluster API related resources to YAML
@@ -122,8 +130,9 @@ func DumpAllResources(ctx context.Context, input DumpAllResourcesInput) {
 	Expect(input.Namespace).NotTo(BeEmpty(), "input.Namespace is required for DumpAllResources")
 
 	resources := GetCAPIResources(ctx, GetCAPIResourcesInput{
-		Lister:    input.Lister,
-		Namespace: input.Namespace,
+		Lister:       input.Lister,
+		Namespace:    input.Namespace,
+		IncludeTypes: input.IncludeTypes,
 	})
 
 	for i := range resources {
@@ -155,10 +164,30 @@ func DumpResourcesForCluster(ctx context.Context, input DumpResourcesForClusterI
 	for _, resource := range input.Resources {
 		resourceList := new(unstructured.UnstructuredList)
 		resourceList.SetGroupVersionKind(resource.GVK)
+
+		var i int
 		var listErr error
 		_ = wait.PollUntilContextTimeout(ctx, retryableOperationInterval, retryableOperationTimeout, true, func(ctx context.Context) (bool, error) {
 			if listErr = input.Lister.List(ctx, resourceList, client.InNamespace(resource.Namespace)); listErr != nil {
-				return false, nil //nolint:nilerr
+				// Fail fast for well known network errors that most likely won't recover.
+				// e.g This error happens when the control plane endpoint for the workload cluster can't be reached from
+				// the machine where the E2E test runs.
+				if strings.HasSuffix(listErr.Error(), "connect: no route to host") {
+					return true, nil
+				}
+				// e.g This error happens when the API server for the workload cluster is down or the control plane endpoint
+				// can't be reached from the machine where the E2E test runs.
+				// NOTE: we consider this error won't recover after it happens at least 3 times in a row
+				if strings.HasSuffix(listErr.Error(), "i/o timeout") {
+					i++
+					if i >= 3 {
+						return true, nil
+					}
+					return false, nil
+				}
+
+				i = 0
+				return false, nil
 			}
 			return true, nil
 		})
@@ -184,7 +213,7 @@ func dumpObject(resource runtime.Object, logPath string) {
 	namespace := metaObj.GetNamespace()
 	name := metaObj.GetName()
 
-	resourceFilePath := filepath.Clean(path.Join(logPath, kind, namespace, name+".yaml"))
+	resourceFilePath := filepath.Clean(path.Join(logPath, namespace, kind, name+".yaml"))
 	Expect(os.MkdirAll(filepath.Dir(resourceFilePath), 0750)).To(Succeed(), "Failed to create folder %s", filepath.Dir(resourceFilePath))
 
 	f, err := os.OpenFile(resourceFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)

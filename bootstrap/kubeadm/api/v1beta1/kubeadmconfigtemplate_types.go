@@ -24,16 +24,18 @@ import (
 
 // KubeadmConfigTemplateSpec defines the desired state of KubeadmConfigTemplate.
 type KubeadmConfigTemplateSpec struct {
+	// template defines the desired state of KubeadmConfigTemplate.
 	Template KubeadmConfigTemplateResource `json:"template"`
 }
 
 // KubeadmConfigTemplateResource defines the Template structure.
 type KubeadmConfigTemplateResource struct {
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	ObjectMeta clusterv1.ObjectMeta `json:"metadata,omitempty"`
 
+	// spec is the desired state of KubeadmConfig.
 	Spec KubeadmConfigSpec `json:"spec,omitempty"`
 }
 
@@ -47,6 +49,7 @@ type KubeadmConfigTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// spec is the desired state of KubeadmConfigTemplate.
 	Spec KubeadmConfigTemplateSpec `json:"spec,omitempty"`
 }
 
@@ -56,7 +59,8 @@ type KubeadmConfigTemplate struct {
 type KubeadmConfigTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []KubeadmConfigTemplate `json:"items"`
+	// items is the list of KubeadmConfigTemplates.
+	Items []KubeadmConfigTemplate `json:"items"`
 }
 
 func init() {

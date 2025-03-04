@@ -14,26 +14,23 @@ aliases:
   # active folks who can be contacted to perform admin-related
   # tasks on the repo, or otherwise approve any PRS.
   cluster-api-admins:
-  - CecileRobertMichon
+  - fabriziopandini
+  - sbueringer
   - vincepri
 
   # non-admin folks who have write-access and can approve any PRs in the repo
   cluster-api-maintainers:
-  - CecileRobertMichon
+  - chrischdi
   - enxebre
   - fabriziopandini
-  - killianmuldoon
   - sbueringer
   - vincepri
 
   # folks who can review and LGTM any PRs in the repo
   cluster-api-reviewers:
-  - chrischdi
   - jackfrancis
   - JoelSpeed
   - richardcase
-  - stmcginnis
-  - ykakarap
 
   # -----------------------------------------------------------
   # OWNER_ALIASES for controllers/topology
@@ -55,10 +52,7 @@ aliases:
   # -----------------------------------------------------------
 
   cluster-api-bootstrap-provider-kubeadm-ignition-maintainers:
-  cluster-api-bootstrap-provider-kubeadm-ignition-reviewers:
-  - dongsupark
-  - invidian
-  - johananl
+  cluster-api-bootstrap-provider-kubeadm-ignition-reviewers: []
 
   # -----------------------------------------------------------
   # OWNER_ALIASES for controlplane/kubeadm
@@ -73,7 +67,6 @@ aliases:
   # -----------------------------------------------------------
 
   cluster-api-clusterctl-maintainers:
-  - ykakarap
   cluster-api-clusterctl-reviewers:
   - Jont828
 
@@ -112,33 +105,33 @@ aliases:
   # OWNER_ALIASES for docs
   # -----------------------------------------------------------
 
-  cluster-api-docs-maintainers:
-  - oscr
+  cluster-api-docs-maintainers: []
   cluster-api-docs-reviewers:
   - elmiko
 
   # -----------------------------------------------------------
-  # OWNER_ALIASES for v1.6 release-team
+  # OWNER_ALIASES for v1.9 release-team
   # -----------------------------------------------------------
 
   cluster-api-release-lead:
-  - furkatgofurov7
-  
+  - mboersma
+
   cluster-api-release-team:
   # members added in commented lines have a pending membership
   # and will be added back once it is acquired.
-  # - adilGhaffarDev
+  # - AttyXY
+  # - blind3dd
   - cahillsf
-  - chiukapoor
-  - furkatgofurov7 # release lead
-  - g-gaston # release comms manager
+  - chandankumar4
+  - cprivitere
   - hackeramitkumar
-  # - kranurag7
-  - mjlshen
-  - nawazkh # release ci manager
-  - nprokopic
-  - Prajyot-Parab
-  # - razashahid107
-  # - Sunnatillo
-  - vincepri
-  - willie-yao
+  - mboersma
+  # - mbrow137
+  # - pratik-mahalle
+  # - ramessesii2
+  # - RansherSingh
+  - serngawy
+  - shecodesmagic
+  - sreeram-venkitesh
+  - Sunnatillo
+  - wendy-ha18

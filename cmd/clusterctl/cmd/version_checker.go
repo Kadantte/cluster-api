@@ -105,9 +105,13 @@ type VersionState struct {
 // version is the same or greater it returns nothing.
 func (v *versionChecker) Check(ctx context.Context) (string, error) {
 	log := logf.Log
-	cliVer, err := semver.ParseTolerant(v.cliVersion().GitVersion)
-	if err != nil {
-		return "", errors.Wrap(err, "unable to semver parse clusterctl GitVersion")
+	var cliVer semver.Version
+	var err error
+	if v.cliVersion().GitVersion != "" {
+		cliVer, err = semver.ParseTolerant(v.cliVersion().GitVersion)
+		if err != nil {
+			return "", errors.Wrap(err, "unable to semver parse clusterctl GitVersion")
+		}
 	}
 
 	release, err := v.getLatestRelease(ctx)
@@ -122,16 +126,16 @@ func (v *versionChecker) Check(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "unable to semver parse latest release version")
 	}
 
-	// if we are using a dirty dev build, just log it out
-	if strings.HasSuffix(cliVer.String(), "-dirty") {
-		log.V(1).Info("⚠️  Using a development build of clusterctl.", "CLIVersion", cliVer.String(), "LatestGithubRelease", release.Version)
+	// if we are using a dirty dev build or go build, just log it out
+	if v.cliVersion().GitVersion == "" || strings.HasSuffix(cliVer.String(), "-dirty") {
+		log.V(1).Info("⚠️  Using a development build of clusterctl.", "cliVersion", cliVer.String(), "latestGithubRelease", release.Version)
 		return "", nil
 	}
 
 	// if the cli version is a dev build off of the latest available release,
 	// the just log it out as informational.
 	if strings.HasPrefix(cliVer.String(), latestVersion.String()) && gitVersionRegEx.MatchString(cliVer.String()) {
-		log.V(1).Info("⚠️  Using a development build of clusterctl.", "CLIVersion", cliVer.String(), "LatestGithubRelease", release.Version)
+		log.V(1).Info("⚠️  Using a development build of clusterctl.", "cliVersion", cliVer.String(), "latestGithubRelease", release.Version)
 		return "", nil
 	}
 
@@ -236,7 +240,7 @@ func writeStateFile(path string, vs *VersionState) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return err
 	}
 	return os.WriteFile(path, vsb, 0600)

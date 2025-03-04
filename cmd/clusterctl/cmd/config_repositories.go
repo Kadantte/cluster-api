@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client"
+	"sigs.k8s.io/cluster-api/cmd/clusterctl/cmd/internal/templates"
 )
 
 const (
@@ -53,20 +54,20 @@ var configRepositoryCmd = &cobra.Command{
 	Use:   "repositories",
 	Args:  cobra.NoArgs,
 	Short: "Display the list of providers and their repository configurations",
-	Long: LongDesc(`
+	Long: templates.LongDesc(`
 		Display the list of providers and their repository configurations.
 
 		clusterctl ships with a list of known providers; if necessary, edit
 		$XDG_CONFIG_HOME/cluster-api/clusterctl.yaml file to add a new provider or to customize existing ones.`),
 
-	Example: Examples(`
+	Example: templates.Examples(`
 		# Displays the list of available providers.
 		clusterctl config repositories
 
 		# Print the list of available providers in yaml format.
 		clusterctl config repositories -o yaml`),
 
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(*cobra.Command, []string) error {
 		return runGetRepositories(cfgFile, os.Stdout)
 	},
 }

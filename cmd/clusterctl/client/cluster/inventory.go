@@ -153,7 +153,7 @@ func (p *inventoryClient) EnsureCustomResourceDefinitions(ctx context.Context) e
 	// NB. NewClient has an internal retry loop that should mitigate temporary connection glitch; here we are
 	// trying to detect persistent connection problems (>10s) before entering in longer retry loops while executing
 	// clusterctl operations.
-	_, err := p.proxy.NewClient()
+	_, err := p.proxy.NewClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (p *inventoryClient) EnsureCustomResourceDefinitions(ctx context.Context) e
 	// Nb. The operation is wrapped in a retry loop to make EnsureCustomResourceDefinitions more resilient to unexpected conditions.
 	var crdIsIstalled bool
 	listInventoryBackoff := newReadBackoff()
-	if err := retryWithExponentialBackoff(listInventoryBackoff, func() error {
+	if err := retryWithExponentialBackoff(ctx, listInventoryBackoff, func(ctx context.Context) error {
 		var err error
 		crdIsIstalled, err = checkInventoryCRDs(ctx, p.proxy)
 		return err
@@ -189,7 +189,7 @@ func (p *inventoryClient) EnsureCustomResourceDefinitions(ctx context.Context) e
 
 		// Create the Kubernetes object.
 		// Nb. The operation is wrapped in a retry loop to make EnsureCustomResourceDefinitions more resilient to unexpected conditions.
-		if err := retryWithExponentialBackoff(createInventoryObjectBackoff, func() error {
+		if err := retryWithExponentialBackoff(ctx, createInventoryObjectBackoff, func(ctx context.Context) error {
 			return p.createObj(ctx, o)
 		}); err != nil {
 			return err
@@ -199,7 +199,7 @@ func (p *inventoryClient) EnsureCustomResourceDefinitions(ctx context.Context) e
 		if apiextensionsv1.SchemeGroupVersion.WithKind("CustomResourceDefinition").GroupKind() == o.GroupVersionKind().GroupKind() {
 			crdKey := client.ObjectKeyFromObject(&o)
 			if err := p.pollImmediateWaiter(ctx, waitInventoryCRDInterval, waitInventoryCRDTimeout, func(ctx context.Context) (bool, error) {
-				c, err := p.proxy.NewClient()
+				c, err := p.proxy.NewClient(ctx)
 				if err != nil {
 					return false, err
 				}
@@ -226,7 +226,7 @@ func (p *inventoryClient) EnsureCustomResourceDefinitions(ctx context.Context) e
 
 // checkInventoryCRDs checks if the inventory CRDs are installed in the cluster.
 func checkInventoryCRDs(ctx context.Context, proxy Proxy) (bool, error) {
-	c, err := proxy.NewClient()
+	c, err := proxy.NewClient(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -248,7 +248,7 @@ func checkInventoryCRDs(ctx context.Context, proxy Proxy) (bool, error) {
 }
 
 func (p *inventoryClient) createObj(ctx context.Context, o unstructured.Unstructured) error {
-	c, err := p.proxy.NewClient()
+	c, err := p.proxy.NewClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -272,8 +272,8 @@ func (p *inventoryClient) createObj(ctx context.Context, o unstructured.Unstruct
 func (p *inventoryClient) Create(ctx context.Context, m clusterctlv1.Provider) error {
 	// Create the Kubernetes object.
 	createInventoryObjectBackoff := newWriteBackoff()
-	return retryWithExponentialBackoff(createInventoryObjectBackoff, func() error {
-		cl, err := p.proxy.NewClient()
+	return retryWithExponentialBackoff(ctx, createInventoryObjectBackoff, func(ctx context.Context) error {
+		cl, err := p.proxy.NewClient(ctx)
 		if err != nil {
 			return err
 		}
@@ -310,7 +310,7 @@ func (p *inventoryClient) List(ctx context.Context) (*clusterctlv1.ProviderList,
 	providerList := &clusterctlv1.ProviderList{}
 
 	listProvidersBackoff := newReadBackoff()
-	if err := retryWithExponentialBackoff(listProvidersBackoff, func() error {
+	if err := retryWithExponentialBackoff(ctx, listProvidersBackoff, func(ctx context.Context) error {
 		return listProviders(ctx, p.proxy, providerList)
 	}); err != nil {
 		return nil, err
@@ -321,7 +321,7 @@ func (p *inventoryClient) List(ctx context.Context) (*clusterctlv1.ProviderList,
 
 // listProviders retrieves the list of provider inventory objects.
 func listProviders(ctx context.Context, proxy Proxy, providerList *clusterctlv1.ProviderList) error {
-	cl, err := proxy.NewClient()
+	cl, err := proxy.NewClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -399,7 +399,7 @@ func (p *inventoryClient) CheckCAPIContract(ctx context.Context, options ...Chec
 		o.Apply(opt)
 	}
 
-	c, err := p.proxy.NewClient()
+	c, err := p.proxy.NewClient(ctx)
 	if err != nil {
 		return err
 	}

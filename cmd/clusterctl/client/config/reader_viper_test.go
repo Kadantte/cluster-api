@@ -49,7 +49,7 @@ func Test_viperReader_Init(t *testing.T) {
 	g.Expect(os.WriteFile(configFileBadContents, []byte("bad-contents"), 0600)).To(Succeed())
 
 	// To test the remote config file
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		_, err := w.Write([]byte("bar: bar"))
 		g.Expect(err).ToNot(HaveOccurred())
@@ -57,7 +57,7 @@ func Test_viperReader_Init(t *testing.T) {
 	defer ts.Close()
 
 	// To test the remote config file when fails to fetch
-	tsFail := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tsFail := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer tsFail.Close()
@@ -125,11 +125,9 @@ func Test_viperReader_Init(t *testing.T) {
 func Test_viperReader_Get(t *testing.T) {
 	g := NewWithT(t)
 
-	dir, err := os.MkdirTemp("", "clusterctl")
-	g.Expect(err).ToNot(HaveOccurred())
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
-	_ = os.Setenv("FOO", "foo")
+	t.Setenv("FOO", "foo")
 
 	configFile := filepath.Join(dir, "clusterctl.yaml")
 	g.Expect(os.WriteFile(configFile, []byte("bar: bar"), 0600)).To(Succeed())
@@ -195,11 +193,9 @@ func Test_viperReader_GetWithoutDefaultConfig(t *testing.T) {
 
 	ctx := context.Background()
 
-	dir, err := os.MkdirTemp("", "clusterctl")
-	g.Expect(err).ToNot(HaveOccurred())
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
-	_ = os.Setenv("FOO_FOO", "bar")
+	t.Setenv("FOO_FOO", "bar")
 
 	v, err := newViperReader(injectConfigPaths([]string{dir}))
 	g.Expect(err).ToNot(HaveOccurred())
@@ -213,11 +209,9 @@ func Test_viperReader_GetWithoutDefaultConfig(t *testing.T) {
 func Test_viperReader_Set(t *testing.T) {
 	g := NewWithT(t)
 
-	dir, err := os.MkdirTemp("", "clusterctl")
-	g.Expect(err).ToNot(HaveOccurred())
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
-	_ = os.Setenv("FOO", "foo")
+	t.Setenv("FOO", "foo")
 
 	configFile := filepath.Join(dir, "clusterctl.yaml")
 
