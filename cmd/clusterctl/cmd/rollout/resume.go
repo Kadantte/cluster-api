@@ -20,9 +20,9 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubectl/pkg/util/templates"
 
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client"
+	"sigs.k8s.io/cluster-api/cmd/clusterctl/cmd/internal/templates"
 )
 
 // resumeOptions is the start of the data required to perform the operation.
@@ -57,7 +57,7 @@ func NewCmdRolloutResume(cfgFile string) *cobra.Command {
 		Short:                 "Resume a cluster-api resource",
 		Long:                  resumeLong,
 		Example:               resumeExample,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			return runResume(cfgFile, args)
 		},
 	}

@@ -18,39 +18,14 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/cluster-api/controllers/external"
 )
-
-// bootstrapTemplateNamePrefix calculates the name prefix for a BootstrapTemplate.
-func bootstrapTemplateNamePrefix(clusterName, machineDeploymentTopologyName string) string {
-	return fmt.Sprintf("%s-%s-", clusterName, machineDeploymentTopologyName)
-}
-
-// infrastructureMachineTemplateNamePrefix calculates the name prefix for a InfrastructureMachineTemplate.
-func infrastructureMachineTemplateNamePrefix(clusterName, machineDeploymentTopologyName string) string {
-	return fmt.Sprintf("%s-%s-", clusterName, machineDeploymentTopologyName)
-}
-
-// bootstrapConfigNamePrefix calculates the name prefix for a BootstrapConfig.
-func bootstrapConfigNamePrefix(clusterName, machinePoolTopologyName string) string {
-	return fmt.Sprintf("%s-%s-", clusterName, machinePoolTopologyName)
-}
-
-// infrastructureMachinePoolNamePrefix calculates the name prefix for a InfrastructureMachinePool.
-func infrastructureMachinePoolNamePrefix(clusterName, machinePoolTopologyName string) string {
-	return fmt.Sprintf("%s-%s-", clusterName, machinePoolTopologyName)
-}
-
-// infrastructureMachineTemplateNamePrefix calculates the name prefix for a InfrastructureMachineTemplate.
-func controlPlaneInfrastructureMachineTemplateNamePrefix(clusterName string) string {
-	return fmt.Sprintf("%s-", clusterName)
-}
 
 // getReference gets the object referenced in ref.
 func (r *Reconciler) getReference(ctx context.Context, ref *corev1.ObjectReference) (*unstructured.Unstructured, error) {
@@ -58,9 +33,9 @@ func (r *Reconciler) getReference(ctx context.Context, ref *corev1.ObjectReferen
 		return nil, errors.New("reference is not set")
 	}
 
-	obj, err := external.Get(ctx, r.UnstructuredCachingClient, ref, ref.Namespace)
+	obj, err := external.Get(ctx, r.Client, ref)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve %s %q in namespace %q", ref.Kind, ref.Name, ref.Namespace)
+		return nil, errors.Wrapf(err, "failed to retrieve %s %s", ref.Kind, klog.KRef(ref.Namespace, ref.Name))
 	}
 	return obj, nil
 }

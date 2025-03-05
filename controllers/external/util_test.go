@@ -63,7 +63,7 @@ func TestGetResourceFound(t *testing.T) {
 	}
 
 	fakeClient := fake.NewClientBuilder().WithObjects(testResource.DeepCopy()).Build()
-	got, err := Get(ctx, fakeClient, testResourceReference, metav1.NamespaceDefault)
+	got, err := Get(ctx, fakeClient, testResourceReference)
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(got).To(BeComparableTo(testResource))
 }
@@ -79,7 +79,7 @@ func TestGetResourceNotFound(t *testing.T) {
 	}
 
 	fakeClient := fake.NewClientBuilder().Build()
-	_, err := Get(ctx, fakeClient, testResourceReference, metav1.NamespaceDefault)
+	_, err := Get(ctx, fakeClient, testResourceReference)
 	g.Expect(err).To(HaveOccurred())
 	g.Expect(apierrors.IsNotFound(errors.Cause(err))).To(BeTrue())
 }
@@ -265,6 +265,7 @@ func TestCloneTemplateResourceFoundNoOwner(t *testing.T) {
 		Client:      fakeClient,
 		TemplateRef: templateRef,
 		Namespace:   metav1.NamespaceDefault,
+		Name:        "object-name",
 		ClusterName: testClusterName,
 	})
 	g.Expect(err).ToNot(HaveOccurred())
@@ -272,7 +273,7 @@ func TestCloneTemplateResourceFoundNoOwner(t *testing.T) {
 	g.Expect(ref.Kind).To(Equal(expectedKind))
 	g.Expect(ref.APIVersion).To(Equal(expectedAPIVersion))
 	g.Expect(ref.Namespace).To(Equal(metav1.NamespaceDefault))
-	g.Expect(ref.Name).To(HavePrefix(templateRef.Name))
+	g.Expect(ref.Name).To(Equal("object-name"))
 
 	clone := &unstructured.Unstructured{}
 	clone.SetKind(expectedKind)

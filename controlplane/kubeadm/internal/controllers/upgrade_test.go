@@ -27,21 +27,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controlplane/kubeadm/internal"
-	"sigs.k8s.io/cluster-api/internal/test/builder"
 	"sigs.k8s.io/cluster-api/internal/util/ssa"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/collections"
+	"sigs.k8s.io/cluster-api/util/test/builder"
 )
 
-const UpdatedVersion string = "v1.17.4"
-const Host string = "nodomain.example.com"
+const (
+	UpdatedVersion string = "v1.17.4"
+	Host           string = "nodomain.example.com"
+)
 
 func TestKubeadmControlPlaneReconciler_RolloutStrategy_ScaleUp(t *testing.T) {
 	setup := func(t *testing.T, g *WithT) *corev1.Namespace {
@@ -68,14 +70,14 @@ func TestKubeadmControlPlaneReconciler_RolloutStrategy_ScaleUp(t *testing.T) {
 	timeout := 30 * time.Second
 
 	cluster, kcp, genericInfrastructureMachineTemplate := createClusterWithControlPlane(namespace.Name)
-	g.Expect(env.Create(ctx, genericInfrastructureMachineTemplate, client.FieldOwner("manager"))).To(Succeed())
+	g.Expect(env.CreateAndWait(ctx, genericInfrastructureMachineTemplate, client.FieldOwner("manager"))).To(Succeed())
 	cluster.UID = types.UID(util.RandomString(10))
 	cluster.Spec.ControlPlaneEndpoint.Host = Host
 	cluster.Spec.ControlPlaneEndpoint.Port = 6443
 	cluster.Status.InfrastructureReady = true
 	kcp.UID = types.UID(util.RandomString(10))
 	kcp.Spec.KubeadmConfigSpec.ClusterConfiguration = nil
-	kcp.Spec.Replicas = pointer.Int32(1)
+	kcp.Spec.Replicas = ptr.To[int32](1)
 	setKCPHealthy(kcp)
 
 	r := &KubeadmControlPlaneReconciler{
@@ -84,17 +86,17 @@ func TestKubeadmControlPlaneReconciler_RolloutStrategy_ScaleUp(t *testing.T) {
 		recorder:            record.NewFakeRecorder(32),
 		managementCluster: &fakeManagementCluster{
 			Management: &internal.Management{Client: env},
-			Workload: fakeWorkloadCluster{
+			Workload: &fakeWorkloadCluster{
 				Status: internal.ClusterStatus{Nodes: 1},
 			},
 		},
 		managementClusterUncached: &fakeManagementCluster{
 			Management: &internal.Management{Client: env},
-			Workload: fakeWorkloadCluster{
+			Workload: &fakeWorkloadCluster{
 				Status: internal.ClusterStatus{Nodes: 1},
 			},
 		},
-		ssaCache: ssa.NewCache(),
+		ssaCache: ssa.NewCache("test-controller"),
 	}
 	controlPlane := &internal.ControlPlane{
 		KCP:      kcp,
@@ -186,18 +188,18 @@ func TestKubeadmControlPlaneReconciler_RolloutStrategy_ScaleDown(t *testing.T) {
 	cluster, kcp, tmpl := createClusterWithControlPlane(metav1.NamespaceDefault)
 	cluster.Spec.ControlPlaneEndpoint.Host = "nodomain.example.com1"
 	cluster.Spec.ControlPlaneEndpoint.Port = 6443
-	kcp.Spec.Replicas = pointer.Int32(3)
+	kcp.Spec.Replicas = ptr.To[int32](3)
 	kcp.Spec.RolloutStrategy.RollingUpdate.MaxSurge.IntVal = 0
 	setKCPHealthy(kcp)
 
 	fmc := &fakeManagementCluster{
 		Machines: collections.Machines{},
-		Workload: fakeWorkloadCluster{
+		Workload: &fakeWorkloadCluster{
 			Status: internal.ClusterStatus{Nodes: 3},
 		},
 	}
 	objs := []client.Object{builder.GenericInfrastructureMachineTemplateCRD, cluster.DeepCopy(), kcp.DeepCopy(), tmpl.DeepCopy()}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		name := fmt.Sprintf("test-%d", i)
 		m := &clusterv1.Machine{
 			ObjectMeta: metav1.ObjectMeta{

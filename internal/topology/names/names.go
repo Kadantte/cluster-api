@@ -86,6 +86,32 @@ func MachinePoolNameGenerator(templateString, clusterName, topologyName string) 
 		})
 }
 
+// KCPMachineNameGenerator returns a generator for creating a kcp machine name.
+func KCPMachineNameGenerator(templateString, clusterName, kubeadmControlPlaneName string) NameGenerator {
+	return newTemplateGenerator(templateString, clusterName,
+		map[string]interface{}{
+			"kubeadmControlPlane": map[string]interface{}{
+				"name": kubeadmControlPlaneName,
+			},
+		})
+}
+
+// MachineSetMachineNameGenerator returns a generator for creating a machineSet machine name.
+func MachineSetMachineNameGenerator(templateString, clusterName, machineSetName string) NameGenerator {
+	return newTemplateGenerator(templateString, clusterName,
+		map[string]interface{}{
+			"machineSet": map[string]interface{}{
+				"name": machineSetName,
+			},
+		})
+}
+
+// InfraClusterNameGenerator returns a generator for creating a infrastructure cluster name.
+func InfraClusterNameGenerator(templateString, clusterName string) NameGenerator {
+	return newTemplateGenerator(templateString, clusterName,
+		map[string]interface{}{})
+}
+
 // templateGenerator parses the template string as text/template and executes it using
 // the passed data to generate a name.
 type templateGenerator struct {
@@ -125,4 +151,29 @@ func (g *templateGenerator) GenerateName() (string, error) {
 	}
 
 	return name, nil
+}
+
+// BootstrapTemplateNamePrefix calculates the name prefix for a BootstrapTemplate.
+func BootstrapTemplateNamePrefix(clusterName, machineDeploymentTopologyName string) string {
+	return fmt.Sprintf("%s-%s-", clusterName, machineDeploymentTopologyName)
+}
+
+// InfrastructureMachineTemplateNamePrefix calculates the name prefix for a InfrastructureMachineTemplate.
+func InfrastructureMachineTemplateNamePrefix(clusterName, machineDeploymentTopologyName string) string {
+	return fmt.Sprintf("%s-%s-", clusterName, machineDeploymentTopologyName)
+}
+
+// BootstrapConfigNamePrefix calculates the name prefix for a BootstrapConfig.
+func BootstrapConfigNamePrefix(clusterName, machinePoolTopologyName string) string {
+	return fmt.Sprintf("%s-%s-", clusterName, machinePoolTopologyName)
+}
+
+// InfrastructureMachinePoolNamePrefix calculates the name prefix for a InfrastructureMachinePool.
+func InfrastructureMachinePoolNamePrefix(clusterName, machinePoolTopologyName string) string {
+	return fmt.Sprintf("%s-%s-", clusterName, machinePoolTopologyName)
+}
+
+// ControlPlaneInfrastructureMachineTemplateNamePrefix calculates the name prefix for a InfrastructureMachineTemplate.
+func ControlPlaneInfrastructureMachineTemplateNamePrefix(clusterName string) string {
+	return fmt.Sprintf("%s-", clusterName)
 }

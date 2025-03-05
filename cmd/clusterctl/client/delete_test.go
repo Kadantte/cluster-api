@@ -68,6 +68,27 @@ func Test_clusterctlClient_Delete(t *testing.T) {
 			wantErr:       false,
 		},
 		{
+			name: "Delete all the providers including CRDs",
+			fields: fields{
+				client: fakeClusterForDelete(),
+			},
+			args: args{
+				options: DeleteOptions{
+					Kubeconfig:              Kubeconfig{Path: "kubeconfig", Context: "mgmt-context"},
+					IncludeNamespace:        false,
+					IncludeCRDs:             true,
+					SkipInventory:           false,
+					CoreProvider:            "",
+					BootstrapProviders:      nil,
+					InfrastructureProviders: nil,
+					ControlPlaneProviders:   nil,
+					DeleteAll:               true, // delete all the providers
+				},
+			},
+			wantProviders: sets.Set[string]{},
+			wantErr:       false,
+		},
+		{
 			name: "Delete single provider auto-detect namespace",
 			fields: fields{
 				client: fakeClusterForDelete(),
@@ -181,7 +202,7 @@ func Test_clusterctlClient_Delete(t *testing.T) {
 			proxy := tt.fields.client.clusters[input].Proxy()
 			gotProviders := &clusterctlv1.ProviderList{}
 
-			c, err := proxy.NewClient()
+			c, err := proxy.NewClient(ctx)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(c.List(ctx, gotProviders)).To(Succeed())
 

@@ -23,10 +23,11 @@ import (
 
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -43,7 +44,7 @@ func TestMachineDeploymentDefault(t *testing.T) {
 			ClusterName: "test-cluster",
 			Template: clusterv1.MachineTemplateSpec{
 				Spec: clusterv1.MachineSpec{
-					Version: pointer.String("1.19.10"),
+					Version: ptr.To("1.19.10"),
 				},
 			},
 		},
@@ -52,7 +53,7 @@ func TestMachineDeploymentDefault(t *testing.T) {
 	scheme := runtime.NewScheme()
 	g.Expect(clusterv1.AddToScheme(scheme)).To(Succeed())
 	webhook := &MachineDeployment{
-		Decoder: admission.NewDecoder(scheme),
+		decoder: admission.NewDecoder(scheme),
 	}
 
 	reqCtx := admission.NewContextWithRequest(ctx, admission.Request{
@@ -66,10 +67,10 @@ func TestMachineDeploymentDefault(t *testing.T) {
 
 	g.Expect(md.Labels[clusterv1.ClusterNameLabel]).To(Equal(md.Spec.ClusterName))
 
-	g.Expect(md.Spec.MinReadySeconds).To(Equal(pointer.Int32(0)))
-	g.Expect(md.Spec.Replicas).To(Equal(pointer.Int32(1)))
-	g.Expect(md.Spec.RevisionHistoryLimit).To(Equal(pointer.Int32(1)))
-	g.Expect(md.Spec.ProgressDeadlineSeconds).To(Equal(pointer.Int32(600)))
+	g.Expect(md.Spec.MinReadySeconds).To(Equal(ptr.To[int32](0)))
+	g.Expect(md.Spec.Replicas).To(Equal(ptr.To[int32](1)))
+	g.Expect(md.Spec.RevisionHistoryLimit).To(Equal(ptr.To[int32](1)))
+	g.Expect(md.Spec.ProgressDeadlineSeconds).To(Equal(ptr.To[int32](600)))
 	g.Expect(md.Spec.Strategy).ToNot(BeNil())
 
 	g.Expect(md.Spec.Selector.MatchLabels).To(HaveKeyWithValue(clusterv1.MachineDeploymentNameLabel, "test-md"))
@@ -85,6 +86,45 @@ func TestMachineDeploymentDefault(t *testing.T) {
 	g.Expect(*md.Spec.Template.Spec.Version).To(Equal("v1.19.10"))
 }
 
+func TestMachineDeploymentReferenceDefault(t *testing.T) {
+	g := NewWithT(t)
+	md := &clusterv1.MachineDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-md",
+		},
+		Spec: clusterv1.MachineDeploymentSpec{
+			ClusterName: "test-cluster",
+			Template: clusterv1.MachineTemplateSpec{
+				Spec: clusterv1.MachineSpec{
+					Version: ptr.To("1.19.10"),
+					Bootstrap: clusterv1.Bootstrap{
+						ConfigRef: &corev1.ObjectReference{},
+					},
+				},
+			},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	g.Expect(clusterv1.AddToScheme(scheme)).To(Succeed())
+	webhook := &MachineDeployment{
+		decoder: admission.NewDecoder(scheme),
+	}
+
+	reqCtx := admission.NewContextWithRequest(ctx, admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Operation: admissionv1.Create,
+		},
+	})
+
+	t.Run("for MachineDeployment", util.CustomDefaultValidateTest(reqCtx, md, webhook))
+
+	g.Expect(webhook.Default(reqCtx, md)).To(Succeed())
+
+	g.Expect(md.Spec.Template.Spec.InfrastructureRef.Namespace).To(Equal(md.Namespace))
+	g.Expect(md.Spec.Template.Spec.Bootstrap.ConfigRef.Namespace).To(Equal(md.Namespace))
+}
+
 func TestCalculateMachineDeploymentReplicas(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -97,7 +137,7 @@ func TestCalculateMachineDeploymentReplicas(t *testing.T) {
 			name: "if new MD has replicas set, keep that value",
 			newMD: &clusterv1.MachineDeployment{
 				Spec: clusterv1.MachineDeploymentSpec{
-					Replicas: pointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 				},
 			},
 			expectedReplicas: 5,
@@ -190,7 +230,7 @@ func TestCalculateMachineDeploymentReplicas(t *testing.T) {
 			},
 			oldMD: &clusterv1.MachineDeployment{
 				Spec: clusterv1.MachineDeploymentSpec{
-					Replicas: pointer.Int32(1),
+					Replicas: ptr.To[int32](1),
 				},
 			},
 			expectedReplicas: 3,
@@ -207,7 +247,7 @@ func TestCalculateMachineDeploymentReplicas(t *testing.T) {
 			},
 			oldMD: &clusterv1.MachineDeployment{
 				Spec: clusterv1.MachineDeploymentSpec{
-					Replicas: pointer.Int32(15),
+					Replicas: ptr.To[int32](15),
 				},
 			},
 			expectedReplicas: 7,
@@ -224,7 +264,7 @@ func TestCalculateMachineDeploymentReplicas(t *testing.T) {
 			},
 			oldMD: &clusterv1.MachineDeployment{
 				Spec: clusterv1.MachineDeploymentSpec{
-					Replicas: pointer.Int32(4),
+					Replicas: ptr.To[int32](4),
 				},
 			},
 			expectedReplicas: 4,
@@ -251,20 +291,24 @@ func TestCalculateMachineDeploymentReplicas(t *testing.T) {
 func TestMachineDeploymentValidation(t *testing.T) {
 	badMaxSurge := intstr.FromString("1")
 	badMaxUnavailable := intstr.FromString("0")
+	badMaxInFlight := intstr.FromString("1")
 
 	goodMaxSurgePercentage := intstr.FromString("1%")
 	goodMaxUnavailablePercentage := intstr.FromString("0%")
+	goodMaxInFlightPercentage := intstr.FromString("20%")
 
 	goodMaxSurgeInt := intstr.FromInt(1)
 	goodMaxUnavailableInt := intstr.FromInt(0)
+	goodMaxInFlightInt := intstr.FromInt(5)
 	tests := []struct {
-		name      string
-		md        *clusterv1.MachineDeployment
-		mdName    string
-		selectors map[string]string
-		labels    map[string]string
-		strategy  clusterv1.MachineDeploymentStrategy
-		expectErr bool
+		name                  string
+		md                    *clusterv1.MachineDeployment
+		mdName                string
+		selectors             map[string]string
+		labels                map[string]string
+		strategy              clusterv1.MachineDeploymentStrategy
+		expectErr             bool
+		machineNamingStrategy clusterv1.MachineNamingStrategy
 	}{
 		{
 			name:      "pass with name of under 63 characters",
@@ -353,6 +397,39 @@ func TestMachineDeploymentValidation(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:      "should return error for invalid remediation maxInFlight",
+			selectors: map[string]string{"foo": "bar"},
+			labels:    map[string]string{"foo": "bar"},
+			strategy: clusterv1.MachineDeploymentStrategy{
+				Remediation: &clusterv1.RemediationStrategy{
+					MaxInFlight: &badMaxInFlight,
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:      "should not return error for valid percentage remediation maxInFlight",
+			selectors: map[string]string{"foo": "bar"},
+			labels:    map[string]string{"foo": "bar"},
+			strategy: clusterv1.MachineDeploymentStrategy{
+				Remediation: &clusterv1.RemediationStrategy{
+					MaxInFlight: &goodMaxInFlightPercentage,
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name:      "should not return error for valid int remediation maxInFlight",
+			selectors: map[string]string{"foo": "bar"},
+			labels:    map[string]string{"foo": "bar"},
+			strategy: clusterv1.MachineDeploymentStrategy{
+				Remediation: &clusterv1.RemediationStrategy{
+					MaxInFlight: &goodMaxInFlightInt,
+				},
+			},
+			expectErr: false,
+		},
+		{
 			name:      "should not return error for valid int maxSurge and maxUnavailable",
 			selectors: map[string]string{"foo": "bar"},
 			labels:    map[string]string{"foo": "bar"},
@@ -378,9 +455,31 @@ func TestMachineDeploymentValidation(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		{
+			name: "should not return error when MachineNamingStrategy have {{ .random }}",
+			machineNamingStrategy: clusterv1.MachineNamingStrategy{
+				Template: "{{ .machineSet.name }}-{{ .random }}",
+			},
+			expectErr: false,
+		},
+		{
+			name: "should return error when MachineNamingStrategy does not have {{ .random }}",
+			machineNamingStrategy: clusterv1.MachineNamingStrategy{
+				Template: "{{ .machineSet.name }}",
+			},
+			expectErr: true,
+		},
+		{
+			name: "should return error when MachineNamingStrategy does not follow DNS1123Subdomain rules",
+			machineNamingStrategy: clusterv1.MachineNamingStrategy{
+				Template: "{{ .machineSet.name }}-{{ .random }}-",
+			},
+			expectErr: true,
+		},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 			md := &clusterv1.MachineDeployment{
@@ -397,13 +496,14 @@ func TestMachineDeploymentValidation(t *testing.T) {
 							Labels: tt.labels,
 						},
 					},
+					MachineNamingStrategy: &tt.machineNamingStrategy,
 				},
 			}
 
 			scheme := runtime.NewScheme()
 			g.Expect(clusterv1.AddToScheme(scheme)).To(Succeed())
 			webhook := MachineDeployment{
-				Decoder: admission.NewDecoder(scheme),
+				decoder: admission.NewDecoder(scheme),
 			}
 
 			if tt.expectErr {
@@ -466,7 +566,7 @@ func TestMachineDeploymentVersionValidation(t *testing.T) {
 				Spec: clusterv1.MachineDeploymentSpec{
 					Template: clusterv1.MachineTemplateSpec{
 						Spec: clusterv1.MachineSpec{
-							Version: pointer.String(tt.version),
+							Version: ptr.To(tt.version),
 						},
 					},
 				},
@@ -475,7 +575,7 @@ func TestMachineDeploymentVersionValidation(t *testing.T) {
 			scheme := runtime.NewScheme()
 			g.Expect(clusterv1.AddToScheme(scheme)).To(Succeed())
 			webhook := MachineDeployment{
-				Decoder: admission.NewDecoder(scheme),
+				decoder: admission.NewDecoder(scheme),
 			}
 
 			if tt.expectErr {
@@ -537,7 +637,7 @@ func TestMachineDeploymentClusterNameImmutable(t *testing.T) {
 			scheme := runtime.NewScheme()
 			g.Expect(clusterv1.AddToScheme(scheme)).To(Succeed())
 			webhook := MachineDeployment{
-				Decoder: admission.NewDecoder(scheme),
+				decoder: admission.NewDecoder(scheme),
 			}
 
 			warnings, err := webhook.ValidateUpdate(ctx, oldMD, newMD)
@@ -589,7 +689,7 @@ func TestMachineDeploymentTemplateMetadataValidation(t *testing.T) {
 			scheme := runtime.NewScheme()
 			g.Expect(clusterv1.AddToScheme(scheme)).To(Succeed())
 			webhook := MachineDeployment{
-				Decoder: admission.NewDecoder(scheme),
+				decoder: admission.NewDecoder(scheme),
 			}
 
 			if tt.expectErr {

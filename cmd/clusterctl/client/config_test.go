@@ -28,7 +28,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	clusterctlv1 "sigs.k8s.io/cluster-api/cmd/clusterctl/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/client/cluster"
@@ -57,17 +57,21 @@ func Test_clusterctlClient_GetProvidersConfig(t *testing.T) {
 			// note: these will be sorted by name by the Providers() call, so be sure they are in alphabetical order here too
 			wantProviders: []string{
 				config.ClusterAPIProviderName,
+				config.CanonicalKubernetesBootstrapProviderName,
+				config.K0smotronBootstrapProviderName,
 				config.KubeadmBootstrapProviderName,
 				config.KubeKeyK3sBootstrapProviderName,
 				config.MicroK8sBootstrapProviderName,
-				config.OracleCloudNativeBootstrapProviderName,
+				config.RKE2BootstrapProviderName,
 				config.TalosBootstrapProviderName,
+				config.CanonicalKubernetesControlPlaneProviderName,
+				config.K0smotronControlPlaneProviderName,
 				config.KamajiControlPlaneProviderName,
 				config.KubeadmControlPlaneProviderName,
 				config.KubeKeyK3sControlPlaneProviderName,
 				config.MicroK8sControlPlaneProviderName,
 				config.NestedControlPlaneProviderName,
-				config.OracleCloudNativeControlPlaneProviderName,
+				config.RKE2ControlPlaneProviderName,
 				config.TalosControlPlaneProviderName,
 				config.AWSProviderName,
 				config.AzureProviderName,
@@ -77,25 +81,38 @@ func Test_clusterctlClient_GetProvidersConfig(t *testing.T) {
 				config.DOProviderName,
 				config.DockerProviderName,
 				config.GCPProviderName,
+				config.HarvesterProviderName,
 				config.HetznerProviderName,
+				config.HivelocityProviderName,
+				config.HuaweiProviderName,
 				config.IBMCloudProviderName,
-				config.InMemoryProviderName,
+				config.IonosCloudProviderName,
+				config.K0smotronProviderName,
 				config.KubeKeyProviderName,
 				config.KubevirtProviderName,
+				config.LinodeProviderName,
 				config.MAASProviderName,
 				config.Metal3ProviderName,
 				config.NestedProviderName,
 				config.NutanixProviderName,
 				config.OCIProviderName,
+				config.OpenNebulaProviderName,
 				config.OpenStackProviderName,
 				config.OutscaleProviderName,
 				config.PacketProviderName,
+				config.ProxmoxProviderName,
 				config.SideroProviderName,
+				config.TinkerbellProviderName,
 				config.VCloudDirectorProviderName,
 				config.VclusterProviderName,
 				config.VirtinkProviderName,
 				config.VSphereProviderName,
+				config.VultrProviderName,
+				config.InClusterIPAMProviderName,
+				config.NutanixIPAMProviderName,
+				config.NutanixRuntimeExtensionsProviderName,
 				config.HelmAddonProviderName,
+				config.FleetAddonProviderName,
 			},
 			wantErr: false,
 		},
@@ -107,18 +124,22 @@ func Test_clusterctlClient_GetProvidersConfig(t *testing.T) {
 			// note: these will be sorted by name by the Providers() call, so be sure they are in alphabetical order here too
 			wantProviders: []string{
 				config.ClusterAPIProviderName,
+				config.CanonicalKubernetesBootstrapProviderName,
 				customProviderConfig.Name(),
+				config.K0smotronBootstrapProviderName,
 				config.KubeadmBootstrapProviderName,
 				config.KubeKeyK3sBootstrapProviderName,
 				config.MicroK8sBootstrapProviderName,
-				config.OracleCloudNativeBootstrapProviderName,
+				config.RKE2BootstrapProviderName,
 				config.TalosBootstrapProviderName,
+				config.CanonicalKubernetesControlPlaneProviderName,
+				config.K0smotronControlPlaneProviderName,
 				config.KamajiControlPlaneProviderName,
 				config.KubeadmControlPlaneProviderName,
 				config.KubeKeyK3sControlPlaneProviderName,
 				config.MicroK8sControlPlaneProviderName,
 				config.NestedControlPlaneProviderName,
-				config.OracleCloudNativeControlPlaneProviderName,
+				config.RKE2ControlPlaneProviderName,
 				config.TalosControlPlaneProviderName,
 				config.AWSProviderName,
 				config.AzureProviderName,
@@ -128,25 +149,38 @@ func Test_clusterctlClient_GetProvidersConfig(t *testing.T) {
 				config.DOProviderName,
 				config.DockerProviderName,
 				config.GCPProviderName,
+				config.HarvesterProviderName,
 				config.HetznerProviderName,
+				config.HivelocityProviderName,
+				config.HuaweiProviderName,
 				config.IBMCloudProviderName,
-				config.InMemoryProviderName,
+				config.IonosCloudProviderName,
+				config.K0smotronProviderName,
 				config.KubeKeyProviderName,
 				config.KubevirtProviderName,
+				config.LinodeProviderName,
 				config.MAASProviderName,
 				config.Metal3ProviderName,
 				config.NestedProviderName,
 				config.NutanixProviderName,
 				config.OCIProviderName,
+				config.OpenNebulaProviderName,
 				config.OpenStackProviderName,
 				config.OutscaleProviderName,
 				config.PacketProviderName,
+				config.ProxmoxProviderName,
 				config.SideroProviderName,
+				config.TinkerbellProviderName,
 				config.VCloudDirectorProviderName,
 				config.VclusterProviderName,
 				config.VirtinkProviderName,
 				config.VSphereProviderName,
+				config.VultrProviderName,
+				config.InClusterIPAMProviderName,
+				config.NutanixIPAMProviderName,
+				config.NutanixRuntimeExtensionsProviderName,
 				config.HelmAddonProviderName,
+				config.FleetAddonProviderName,
 			},
 			wantErr: false,
 		},
@@ -300,8 +334,8 @@ func Test_clusterctlClient_templateOptionsToVariables(t *testing.T) {
 					ClusterName:              "foo",
 					TargetNamespace:          "bar",
 					KubernetesVersion:        "v1.2.3",
-					ControlPlaneMachineCount: pointer.Int64(1),
-					WorkerMachineCount:       pointer.Int64(2),
+					ControlPlaneMachineCount: ptr.To[int64](1),
+					WorkerMachineCount:       ptr.To[int64](2),
 				},
 			},
 			wantVars: map[string]string{
@@ -320,8 +354,8 @@ func Test_clusterctlClient_templateOptionsToVariables(t *testing.T) {
 					ClusterName:              "foo",
 					TargetNamespace:          "bar",
 					KubernetesVersion:        "", // empty means to use value from env variables/config file
-					ControlPlaneMachineCount: pointer.Int64(1),
-					WorkerMachineCount:       pointer.Int64(2),
+					ControlPlaneMachineCount: ptr.To[int64](1),
+					WorkerMachineCount:       ptr.To[int64](2),
 				},
 			},
 			wantVars: map[string]string{
@@ -398,7 +432,7 @@ func Test_clusterctlClient_templateOptionsToVariables(t *testing.T) {
 					ClusterName:              "foo",
 					TargetNamespace:          "bar",
 					KubernetesVersion:        "v1.2.3",
-					ControlPlaneMachineCount: pointer.Int64(-1),
+					ControlPlaneMachineCount: ptr.To[int64](-1),
 				},
 			},
 			wantErr: true,
@@ -410,8 +444,8 @@ func Test_clusterctlClient_templateOptionsToVariables(t *testing.T) {
 					ClusterName:              "foo",
 					TargetNamespace:          "bar",
 					KubernetesVersion:        "v1.2.3",
-					ControlPlaneMachineCount: pointer.Int64(1),
-					WorkerMachineCount:       pointer.Int64(-1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
+					WorkerMachineCount:       ptr.To[int64](-1),
 				},
 			},
 			wantErr: true,
@@ -558,7 +592,7 @@ func Test_clusterctlClient_GetClusterTemplate(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -578,7 +612,7 @@ func Test_clusterctlClient_GetClusterTemplate(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -598,7 +632,7 @@ func Test_clusterctlClient_GetClusterTemplate(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "", // empty triggers usage of the current namespace
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -617,7 +651,7 @@ func Test_clusterctlClient_GetClusterTemplate(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -638,7 +672,7 @@ func Test_clusterctlClient_GetClusterTemplate(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -776,7 +810,7 @@ func Test_clusterctlClient_GetClusterTemplate_onEmptyCluster(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -796,7 +830,7 @@ func Test_clusterctlClient_GetClusterTemplate_onEmptyCluster(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			wantErr: true,
@@ -811,7 +845,7 @@ func Test_clusterctlClient_GetClusterTemplate_onEmptyCluster(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -832,7 +866,7 @@ func Test_clusterctlClient_GetClusterTemplate_onEmptyCluster(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -872,7 +906,7 @@ func newFakeClientWithoutCluster(configClient config.Client) *fakeClient {
 	var err error
 	fake.internalClient, err = newClusterctlClient(context.Background(), "fake-config",
 		InjectConfig(fake.configClient),
-		InjectRepositoryFactory(func(ctx context.Context, input RepositoryClientFactoryInput) (repository.Client, error) {
+		InjectRepositoryFactory(func(_ context.Context, input RepositoryClientFactoryInput) (repository.Client, error) {
 			if _, ok := fake.repositories[input.Provider.ManifestLabel()]; !ok {
 				return nil, errors.Errorf("repository for kubeconfig %q does not exist", input.Provider.ManifestLabel())
 			}
@@ -929,7 +963,7 @@ func Test_clusterctlClient_GetClusterTemplate_withoutCluster(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			want: templateValues{
@@ -949,7 +983,7 @@ func Test_clusterctlClient_GetClusterTemplate_withoutCluster(t *testing.T) {
 					},
 					ClusterName:              "test",
 					TargetNamespace:          "ns1",
-					ControlPlaneMachineCount: pointer.Int64(1),
+					ControlPlaneMachineCount: ptr.To[int64](1),
 				},
 			},
 			wantErr: true,
@@ -1055,7 +1089,7 @@ v3: default3`,
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(*testing.T) {
 			config1 := newFakeConfig(ctx).
 				WithProvider(infraProviderConfig)
 			cluster1 := newFakeCluster(cluster.Kubeconfig{}, config1)

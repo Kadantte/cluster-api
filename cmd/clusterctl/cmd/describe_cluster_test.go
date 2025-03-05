@@ -289,7 +289,254 @@ func Test_TreePrefix(t *testing.T) {
 			addObjectRow("", tbl, tt.objectTree, tt.objectTree.GetRoot())
 			tbl.Render()
 
+			// Compare the output with the expected prefix.
+			// We only check whether the output starts with the expected prefix,
+			// meaning expectPrefix does not contain the full expected output.
 			g.Expect(output.String()).Should(MatchTable(tt.expectPrefix))
+		})
+	}
+}
+
+func Test_V1Beta2TreePrefix(t *testing.T) {
+	tests := []struct {
+		name         string
+		objectTree   *tree.ObjectTree
+		expectPrefix []string
+	}{
+		{
+			name: "Conditions should get the right prefix with multiline message",
+			objectTree: func() *tree.ObjectTree {
+				root := fakeObject("root",
+					withV1Beta2Condition(metav1.Condition{
+						Type:    "Available",
+						Status:  metav1.ConditionFalse,
+						Reason:  "NotAvailable",
+						Message: "first line must not be validated in the test\nsecond line",
+					}),
+				)
+				objectTree := tree.NewObjectTree(root, tree.ObjectTreeOptions{
+					V1Beta2: true,
+				})
+
+				o1 := fakeObject("child1",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+
+				o2 := fakeObject("child2",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				objectTree.Add(root, o1)
+				objectTree.Add(root, o2)
+				return objectTree
+			}(),
+			expectPrefix: []string{
+				"Object/root              Available: False  NotAvailable",
+				"│                                                              second line",
+				"├─Object/child1          Available: False  NotAvailable",
+				"│                                                              second line",
+				"└─Object/child2          Available: False  NotAvailable",
+				"                                                               second line",
+			},
+		},
+		{
+			name: "Conditions should get the right prefix with multiline message and a child",
+			objectTree: func() *tree.ObjectTree {
+				root := fakeObject("root",
+					withV1Beta2Condition(metav1.Condition{
+						Type:   "Available",
+						Status: metav1.ConditionTrue,
+						Reason: "Available",
+					}),
+				)
+				obectjTree := tree.NewObjectTree(root, tree.ObjectTreeOptions{
+					V1Beta2: true,
+				})
+
+				o1 := fakeObject("child1",
+					withV1Beta2Condition(trueV1Beta2Condition()),
+				)
+
+				o2 := fakeObject("child2",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o2_1 := fakeObject("child2.1")
+				obectjTree.Add(root, o1)
+				obectjTree.Add(root, o2)
+				obectjTree.Add(o2, o2_1)
+				return obectjTree
+			}(),
+			expectPrefix: []string{
+				"Object/root                  Available: True   Available",
+				"├─Object/child1              Available: True   Available",
+				"└─Object/child2              Available: False  NotAvailable",
+				"  │                                                                second line",
+				"  └─Object/child2.1",
+			},
+		},
+		{
+			name: "Multiple nested childs should get the right multiline prefix",
+			objectTree: func() *tree.ObjectTree {
+				root := fakeObject("root",
+					withV1Beta2Condition(metav1.Condition{
+						Type:   "Available",
+						Status: metav1.ConditionTrue,
+						Reason: "Available",
+					}),
+				)
+				obectjTree := tree.NewObjectTree(root, tree.ObjectTreeOptions{
+					V1Beta2: true,
+				})
+
+				o1 := fakeObject("child1",
+					withV1Beta2Condition(trueV1Beta2Condition()),
+				)
+				o2 := fakeObject("child2",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o3 := fakeObject("child3",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o4 := fakeObject("child4",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o5 := fakeObject("child5",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				obectjTree.Add(root, o1)
+				obectjTree.Add(o1, o2)
+				obectjTree.Add(o2, o3)
+				obectjTree.Add(o3, o4)
+				obectjTree.Add(root, o5)
+				return obectjTree
+			}(),
+			expectPrefix: []string{
+				"Object/root                    Available: True   Available",
+				"├─Object/child1                Available: True   Available",
+				"│ └─Object/child2              Available: False  NotAvailable",
+				"│   │                                                                second line",
+				"│   └─Object/child3            Available: False  NotAvailable",
+				"│     │                                                              second line",
+				"│     └─Object/child4          Available: False  NotAvailable",
+				"│                                                                    second line",
+				"└─Object/child5                Available: False  NotAvailable",
+				"                                                                     second line",
+			},
+		},
+		{
+			name: "Nested childs should get the right prefix with multiline message",
+			objectTree: func() *tree.ObjectTree {
+				root := fakeObject("root",
+					withV1Beta2Condition(metav1.Condition{
+						Type:   "Available",
+						Status: metav1.ConditionTrue,
+						Reason: "Available",
+					}),
+				)
+				obectjTree := tree.NewObjectTree(root, tree.ObjectTreeOptions{
+					V1Beta2: true,
+				})
+
+				o1 := fakeObject("child1",
+					withV1Beta2Condition(trueV1Beta2Condition()),
+				)
+				o2 := fakeObject("child2",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o3 := fakeObject("child3",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o4 := fakeObject("child4",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				obectjTree.Add(root, o1)
+				obectjTree.Add(o1, o2)
+				obectjTree.Add(o2, o3)
+				obectjTree.Add(o3, o4)
+				return obectjTree
+			}(),
+			expectPrefix: []string{
+				"Object/root                    Available: True   Available",
+				"└─Object/child1                Available: True   Available",
+				"  └─Object/child2              Available: False  NotAvailable",
+				"    │                                                                second line",
+				"    └─Object/child3            Available: False  NotAvailable",
+				"      │                                                              second line",
+				"      └─Object/child4          Available: False  NotAvailable",
+				"                                                                     second line",
+			},
+		},
+		{
+			name: "Conditions should get the right prefix with childs",
+			objectTree: func() *tree.ObjectTree {
+				root := fakeObject("root",
+					withV1Beta2Condition(metav1.Condition{
+						Type:   "Available",
+						Status: metav1.ConditionTrue,
+						Reason: "Available",
+					}),
+				)
+				obectjTree := tree.NewObjectTree(root, tree.ObjectTreeOptions{
+					V1Beta2: true,
+				})
+
+				o1 := fakeObject("child1",
+					withV1Beta2Condition(trueV1Beta2Condition()),
+				)
+
+				o2 := fakeObject("child2",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o2_1 := fakeObject("child2.1",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o3 := fakeObject("child3",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				o3_1 := fakeObject("child3.1",
+					withV1Beta2Condition(falseV1Beta2Condition("Available", "first line must not be validated in the test\nsecond line")),
+				)
+				obectjTree.Add(root, o1)
+				obectjTree.Add(root, o2)
+				obectjTree.Add(o2, o2_1)
+				obectjTree.Add(root, o3)
+				obectjTree.Add(o3, o3_1)
+				return obectjTree
+			}(),
+			expectPrefix: []string{
+				"Object/root                  Available: True   Available",
+				"├─Object/child1              Available: True   Available",
+				"├─Object/child2              Available: False  NotAvailable",
+				"│ │                                                                second line",
+				"│ └─Object/child2.1          Available: False  NotAvailable",
+				"│                                                                  second line",
+				"└─Object/child3              Available: False  NotAvailable",
+				"  │                                                                second line",
+				"  └─Object/child3.1          Available: False  NotAvailable",
+				"                                                                   second line",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+			var output bytes.Buffer
+
+			// Creates the output table
+			tbl := tablewriter.NewWriter(&output)
+
+			formatTableTreeV1Beta2(tbl)
+
+			// Add row for the root object, the cluster, and recursively for all the nodes representing the cluster status.
+			addObjectRowV1Beta2("", tbl, tt.objectTree, tt.objectTree.GetRoot())
+			tbl.Render()
+
+			// Remove empty lines from the output. We need this because v1beta2 adds lines at the beginning and end.
+			outputString := strings.TrimSpace(output.String())
+
+			// Compare the output with the expected prefix.
+			// We only check whether the output starts with the expected prefix,
+			// meaning expectPrefix does not contain the full expected output.
+			g.Expect(outputString).Should(MatchTable(tt.expectPrefix))
 		})
 	}
 }
@@ -331,6 +578,32 @@ func withCondition(c *clusterv1.Condition) func(ctrlclient.Object) {
 	}
 }
 
+func withV1Beta2Condition(c metav1.Condition) func(ctrlclient.Object) {
+	return func(m ctrlclient.Object) {
+		cluster := m.(*clusterv1.Cluster)
+		conds := cluster.GetV1Beta2Conditions()
+		conds = append(conds, c)
+		cluster.SetV1Beta2Conditions(conds)
+	}
+}
+
+func trueV1Beta2Condition() metav1.Condition {
+	return metav1.Condition{
+		Type:   "Available",
+		Status: metav1.ConditionTrue,
+		Reason: "Available",
+	}
+}
+
+func falseV1Beta2Condition(t, m string) metav1.Condition {
+	return metav1.Condition{
+		Type:    t,
+		Status:  metav1.ConditionFalse,
+		Reason:  "Not" + t,
+		Message: m,
+	}
+}
+
 func withDeletionTimestamp(object ctrlclient.Object) {
 	now := metav1.Now()
 	object.SetDeletionTimestamp(&now)
@@ -364,4 +637,42 @@ func (t *Table) FailureMessage(actual interface{}) string {
 func (t *Table) NegatedFailureMessage(actual interface{}) string {
 	actualTable := strings.Split(actual.(string), "\n")
 	return fmt.Sprintf("Expected %v and received %v", t.tableData, actualTable)
+}
+
+func Test_formatParagraph(t *testing.T) {
+	tests := []struct {
+		text     string
+		maxWidth int
+		want     string
+	}{
+		{
+			text:     "",
+			maxWidth: 254,
+			want:     "",
+		},
+		{
+			text:     "* a b c d e f",
+			maxWidth: 5,
+			want:     "* a b\n  c d\n  e f",
+		},
+		{
+			text: "* a b c d e f\n" +
+				"  * g h\n" +
+				"  * i j",
+			maxWidth: 5,
+			want: "* a b\n" +
+				"  c d\n" +
+				"  e f\n" +
+				"  * g\n" +
+				"    h\n" +
+				"  * i\n" +
+				"    j",
+		},
+	}
+	for ti, tt := range tests {
+		t.Run(fmt.Sprintf("%d", ti), func(t *testing.T) {
+			g := NewWithT(t)
+			g.Expect("\n" + formatParagraph(tt.text, tt.maxWidth)).To(BeEquivalentTo("\n" + tt.want))
+		})
+	}
 }

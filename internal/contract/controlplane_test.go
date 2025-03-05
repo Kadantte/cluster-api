@@ -147,6 +147,96 @@ func TestControlPlane(t *testing.T) {
 		g.Expect(got).ToNot(BeNil())
 		g.Expect(*got).To(Equal(int64(3)))
 	})
+	t.Run("Manages status.readyReplicas for v1beta2 status", func(t *testing.T) {
+		g := NewWithT(t)
+
+		g.Expect(ControlPlane().V1Beta2ReadyReplicas().Path()).To(Equal([]Path{{"status", "v1beta2", "readyReplicas"}, {"status", "readyReplicas"}}))
+
+		obj := &unstructured.Unstructured{Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"readyReplicas": int64(3),
+				"v1beta2": map[string]interface{}{
+					"readyReplicas": int64(5),
+				},
+			},
+		}}
+
+		got, err := ControlPlane().V1Beta2ReadyReplicas().Get(obj)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(got).ToNot(BeNil())
+		g.Expect(*got).To(Equal(int32(5)))
+
+		obj = &unstructured.Unstructured{Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"readyReplicas": int64(3),
+			},
+		}}
+
+		got, err = ControlPlane().V1Beta2ReadyReplicas().Get(obj)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(got).ToNot(BeNil())
+		g.Expect(*got).To(Equal(int32(3)))
+	})
+	t.Run("Manages status.availableReplicas for v1beta2 status", func(t *testing.T) {
+		g := NewWithT(t)
+
+		g.Expect(ControlPlane().V1Beta2AvailableReplicas().Path()).To(Equal([]Path{{"status", "v1beta2", "availableReplicas"}, {"status", "availableReplicas"}}))
+
+		obj := &unstructured.Unstructured{Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"availableReplicas": int64(3),
+				"v1beta2": map[string]interface{}{
+					"availableReplicas": int64(5),
+				},
+			},
+		}}
+
+		got, err := ControlPlane().V1Beta2AvailableReplicas().Get(obj)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(got).ToNot(BeNil())
+		g.Expect(*got).To(Equal(int32(5)))
+
+		obj = &unstructured.Unstructured{Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"availableReplicas": int64(3),
+			},
+		}}
+
+		got, err = ControlPlane().V1Beta2AvailableReplicas().Get(obj)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(got).ToNot(BeNil())
+		g.Expect(*got).To(Equal(int32(3)))
+	})
+	t.Run("Manages status.upToDateReplicas for v1beta2 status", func(t *testing.T) {
+		g := NewWithT(t)
+
+		g.Expect(ControlPlane().V1Beta2UpToDateReplicas().Path()).To(Equal([]Path{{"status", "v1beta2", "upToDateReplicas"}, {"status", "upToDateReplicas"}}))
+
+		obj := &unstructured.Unstructured{Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"upToDateReplicas": int64(3),
+				"v1beta2": map[string]interface{}{
+					"upToDateReplicas": int64(5),
+				},
+			},
+		}}
+
+		got, err := ControlPlane().V1Beta2UpToDateReplicas().Get(obj)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(got).ToNot(BeNil())
+		g.Expect(*got).To(Equal(int32(5)))
+
+		obj = &unstructured.Unstructured{Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"upToDateReplicas": int64(3),
+			},
+		}}
+
+		got, err = ControlPlane().V1Beta2UpToDateReplicas().Get(obj)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(got).ToNot(BeNil())
+		g.Expect(*got).To(Equal(int32(3)))
+	})
 	t.Run("Manages status.selector", func(t *testing.T) {
 		g := NewWithT(t)
 
@@ -265,6 +355,50 @@ func TestControlPlane(t *testing.T) {
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(found).To(BeTrue())
 		g.Expect(durationString).To(Equal(expectedDurationString))
+	})
+	t.Run("Manages spec.machineTemplate.readinessGates", func(t *testing.T) {
+		g := NewWithT(t)
+
+		readinessGates := []clusterv1.MachineReadinessGate{
+			{ConditionType: "foo"},
+			{ConditionType: "bar"},
+		}
+
+		g.Expect(ControlPlane().MachineTemplate().ReadinessGates().Path()).To(Equal(Path{"spec", "machineTemplate", "readinessGates"}))
+
+		err := ControlPlane().MachineTemplate().ReadinessGates().Set(obj, readinessGates)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		got, err := ControlPlane().MachineTemplate().ReadinessGates().Get(obj)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(got).ToNot(BeNil())
+		g.Expect(got).To(BeComparableTo(readinessGates))
+
+		// Nil readinessGates are not set.
+		obj2 := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		readinessGates = nil
+
+		err = ControlPlane().MachineTemplate().ReadinessGates().Set(obj2, readinessGates)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		_, ok, err := unstructured.NestedSlice(obj2.UnstructuredContent(), ControlPlane().MachineTemplate().ReadinessGates().Path()...)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(ok).To(BeFalse())
+
+		_, err = ControlPlane().MachineTemplate().ReadinessGates().Get(obj2)
+		g.Expect(err).To(HaveOccurred())
+
+		// Empty readinessGates are set.
+		obj3 := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		readinessGates = []clusterv1.MachineReadinessGate{}
+
+		err = ControlPlane().MachineTemplate().ReadinessGates().Set(obj3, readinessGates)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		got, err = ControlPlane().MachineTemplate().ReadinessGates().Get(obj3)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(got).ToNot(BeNil())
+		g.Expect(got).To(BeComparableTo(readinessGates))
 	})
 }
 

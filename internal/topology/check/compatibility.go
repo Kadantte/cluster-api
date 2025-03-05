@@ -86,7 +86,7 @@ func ObjectsAreInTheSameNamespace(current, desired client.Object) field.ErrorLis
 }
 
 // LocalObjectTemplatesAreCompatible checks if two referenced objects are compatible, meaning that
-// they are of the same GroupKind and in the same namespace.
+// they are of the same GroupKind.
 func LocalObjectTemplatesAreCompatible(current, desired clusterv1.LocalObjectTemplate, pathPrefix *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -105,20 +105,6 @@ func LocalObjectTemplatesAreCompatible(current, desired clusterv1.LocalObjectTem
 			pathPrefix.Child("ref", "kind"),
 			fmt.Sprintf("apiVersion.kind cannot be changed from %q to %q to prevent incompatible changes in the Clusters",
 				currentGK.Kind, desiredGK.Kind),
-		))
-	}
-	allErrs = append(allErrs, LocalObjectTemplatesAreInSameNamespace(current, desired, pathPrefix)...)
-	return allErrs
-}
-
-// LocalObjectTemplatesAreInSameNamespace checks if two referenced objects are in the same namespace.
-func LocalObjectTemplatesAreInSameNamespace(current, desired clusterv1.LocalObjectTemplate, pathPrefix *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	if current.Ref.Namespace != desired.Ref.Namespace {
-		allErrs = append(allErrs, field.Forbidden(
-			pathPrefix.Child("ref", "namespace"),
-			fmt.Sprintf("templates must be in the same namespace as the ClusterClass (%s)",
-				current.Ref.Namespace),
 		))
 	}
 	return allErrs
@@ -450,14 +436,16 @@ func ClusterClassReferencesAreValid(clusterClass *clusterv1.ClusterClass) field.
 		allErrs = append(allErrs, LocalObjectTemplateIsValid(clusterClass.Spec.ControlPlane.MachineInfrastructure, clusterClass.Namespace, field.NewPath("spec", "controlPlane", "machineInfrastructure"))...)
 	}
 
-	for i, mdc := range clusterClass.Spec.Workers.MachineDeployments {
+	for i := range clusterClass.Spec.Workers.MachineDeployments {
+		mdc := clusterClass.Spec.Workers.MachineDeployments[i]
 		allErrs = append(allErrs, LocalObjectTemplateIsValid(&mdc.Template.Bootstrap, clusterClass.Namespace,
 			field.NewPath("spec", "workers", "machineDeployments").Index(i).Child("template", "bootstrap"))...)
 		allErrs = append(allErrs, LocalObjectTemplateIsValid(&mdc.Template.Infrastructure, clusterClass.Namespace,
 			field.NewPath("spec", "workers", "machineDeployments").Index(i).Child("template", "infrastructure"))...)
 	}
 
-	for i, mpc := range clusterClass.Spec.Workers.MachinePools {
+	for i := range clusterClass.Spec.Workers.MachinePools {
+		mpc := clusterClass.Spec.Workers.MachinePools[i]
 		allErrs = append(allErrs, LocalObjectTemplateIsValid(&mpc.Template.Bootstrap, clusterClass.Namespace,
 			field.NewPath("spec", "workers", "machinePools").Index(i).Child("template", "bootstrap"))...)
 		allErrs = append(allErrs, LocalObjectTemplateIsValid(&mpc.Template.Infrastructure, clusterClass.Namespace,

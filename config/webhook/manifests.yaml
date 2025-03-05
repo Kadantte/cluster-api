@@ -305,6 +305,28 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-cluster-x-k8s-io-v1beta1-machinedrainrule
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.machinedrainrule.cluster.x-k8s.io
+  rules:
+  - apiGroups:
+    - cluster.x-k8s.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - machinedrainrules
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-cluster-x-k8s-io-v1beta1-machinehealthcheck
   failurePolicy: Fail
   matchPolicy: Equivalent
@@ -437,7 +459,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-ipam-cluster-x-k8s-io-v1alpha1-ipaddress
+      path: /validate-ipam-cluster-x-k8s-io-v1beta1-ipaddress
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.ipaddress.ipam.cluster.x-k8s.io
@@ -445,7 +467,7 @@ webhooks:
   - apiGroups:
     - ipam.cluster.x-k8s.io
     apiVersions:
-    - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -460,7 +482,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-ipam-cluster-x-k8s-io-v1alpha1-ipaddressclaim
+      path: /validate-ipam-cluster-x-k8s-io-v1beta1-ipaddressclaim
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.ipaddressclaim.ipam.cluster.x-k8s.io
@@ -468,7 +490,7 @@ webhooks:
   - apiGroups:
     - ipam.cluster.x-k8s.io
     apiVersions:
-    - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE

@@ -31,24 +31,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/feature"
+	topologynames "sigs.k8s.io/cluster-api/internal/topology/names"
 	"sigs.k8s.io/cluster-api/util/version"
 )
 
 func (webhook *MachineDeployment) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	if webhook.Decoder == nil {
-		webhook.Decoder = admission.NewDecoder(mgr.GetScheme())
+	if webhook.decoder == nil {
+		webhook.decoder = admission.NewDecoder(mgr.GetScheme())
 	}
 
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&clusterv1.MachineDeployment{}).
-		WithDefaulter(webhook).
+		WithDefaulter(webhook, admission.DefaulterRemoveUnknownOrOmitableFields).
 		WithValidator(webhook).
 		Complete()
 }
@@ -58,7 +59,7 @@ func (webhook *MachineDeployment) SetupWebhookWithManager(mgr ctrl.Manager) erro
 
 // MachineDeployment implements a validation and defaulting webhook for MachineDeployment.
 type MachineDeployment struct {
-	Decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 var _ webhook.CustomDefaulter = &MachineDeployment{}
@@ -83,7 +84,7 @@ func (webhook *MachineDeployment) Default(ctx context.Context, obj runtime.Objec
 	var oldMD *clusterv1.MachineDeployment
 	if req.Operation == v1.Update {
 		oldMD = &clusterv1.MachineDeployment{}
-		if err := webhook.Decoder.DecodeRaw(req.OldObject, oldMD); err != nil {
+		if err := webhook.decoder.DecodeRaw(req.OldObject, oldMD); err != nil {
 			return errors.Wrapf(err, "failed to decode oldObject to MachineDeployment")
 		}
 	}
@@ -97,18 +98,18 @@ func (webhook *MachineDeployment) Default(ctx context.Context, obj runtime.Objec
 	if err != nil {
 		return err
 	}
-	m.Spec.Replicas = pointer.Int32(replicas)
+	m.Spec.Replicas = ptr.To[int32](replicas)
 
 	if m.Spec.MinReadySeconds == nil {
-		m.Spec.MinReadySeconds = pointer.Int32(0)
+		m.Spec.MinReadySeconds = ptr.To[int32](0)
 	}
 
 	if m.Spec.RevisionHistoryLimit == nil {
-		m.Spec.RevisionHistoryLimit = pointer.Int32(1)
+		m.Spec.RevisionHistoryLimit = ptr.To[int32](1)
 	}
 
 	if m.Spec.ProgressDeadlineSeconds == nil {
-		m.Spec.ProgressDeadlineSeconds = pointer.Int32(600)
+		m.Spec.ProgressDeadlineSeconds = ptr.To[int32](600)
 	}
 
 	if m.Spec.Selector.MatchLabels == nil {
@@ -156,6 +157,15 @@ func (webhook *MachineDeployment) Default(ctx context.Context, obj runtime.Objec
 	if m.Spec.Template.Spec.Version != nil && !strings.HasPrefix(*m.Spec.Template.Spec.Version, "v") {
 		normalizedVersion := "v" + *m.Spec.Template.Spec.Version
 		m.Spec.Template.Spec.Version = &normalizedVersion
+	}
+
+	// Make sure the namespace of the referent is populated
+	if m.Spec.Template.Spec.Bootstrap.ConfigRef != nil && m.Spec.Template.Spec.Bootstrap.ConfigRef.Namespace == "" {
+		m.Spec.Template.Spec.Bootstrap.ConfigRef.Namespace = m.Namespace
+	}
+
+	if m.Spec.Template.Spec.InfrastructureRef.Namespace == "" {
+		m.Spec.Template.Spec.InfrastructureRef.Namespace = m.Namespace
 	}
 
 	return nil
@@ -268,10 +278,31 @@ func (webhook *MachineDeployment) validate(oldMD, newMD *clusterv1.MachineDeploy
 		}
 	}
 
+	if newMD.Spec.Strategy != nil && newMD.Spec.Strategy.Remediation != nil {
+		total := 1
+		if newMD.Spec.Replicas != nil {
+			total = int(*newMD.Spec.Replicas)
+		}
+
+		if newMD.Spec.Strategy.Remediation.MaxInFlight != nil {
+			if _, err := intstr.GetScaledValueFromIntOrPercent(newMD.Spec.Strategy.Remediation.MaxInFlight, total, true); err != nil {
+				allErrs = append(
+					allErrs,
+					field.Invalid(specPath.Child("strategy", "remediation", "maxInFlight"),
+						newMD.Spec.Strategy.Remediation.MaxInFlight.String(), fmt.Sprintf("must be either an int or a percentage: %v", err.Error())),
+				)
+			}
+		}
+	}
+
 	if newMD.Spec.Template.Spec.Version != nil {
 		if !version.KubeSemver.MatchString(*newMD.Spec.Template.Spec.Version) {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("template", "spec", "version"), *newMD.Spec.Template.Spec.Version, "must be a valid semantic version"))
 		}
+	}
+
+	if newMD.Spec.MachineNamingStrategy != nil {
+		allErrs = append(allErrs, validateMDMachineNamingStrategy(newMD.Spec.MachineNamingStrategy, specPath.Child("machineNamingStrategy"))...)
 	}
 
 	// Validate the metadata of the template.
@@ -282,6 +313,41 @@ func (webhook *MachineDeployment) validate(oldMD, newMD *clusterv1.MachineDeploy
 	}
 
 	return apierrors.NewInvalid(clusterv1.GroupVersion.WithKind("MachineDeployment").GroupKind(), newMD.Name, allErrs)
+}
+
+func validateMDMachineNamingStrategy(machineNamingStrategy *clusterv1.MachineNamingStrategy, pathPrefix *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if machineNamingStrategy.Template != "" {
+		if !strings.Contains(machineNamingStrategy.Template, "{{ .random }}") {
+			allErrs = append(allErrs,
+				field.Invalid(
+					pathPrefix.Child("template"),
+					machineNamingStrategy.Template,
+					"invalid template, {{ .random }} is missing",
+				))
+		}
+		name, err := topologynames.MachineSetMachineNameGenerator(machineNamingStrategy.Template, "cluster", "machineset").GenerateName()
+		if err != nil {
+			allErrs = append(allErrs,
+				field.Invalid(
+					pathPrefix.Child("template"),
+					machineNamingStrategy.Template,
+					fmt.Sprintf("invalid template: %v", err),
+				))
+		} else {
+			for _, err := range validation.IsDNS1123Subdomain(name) {
+				allErrs = append(allErrs,
+					field.Invalid(
+						pathPrefix.Child("template"),
+						machineNamingStrategy.Template,
+						fmt.Sprintf("invalid template, generated names would not be valid Kubernetes object names: %v", err),
+					))
+			}
+		}
+	}
+
+	return allErrs
 }
 
 // calculateMachineDeploymentReplicas calculates the default value of the replicas field.
@@ -300,19 +366,14 @@ func (webhook *MachineDeployment) validate(oldMD, newMD *clusterv1.MachineDeploy
 //
 // We are supporting the following use cases:
 // * A new MD is created and replicas should be managed by the autoscaler
-//   - Either via the default annotation or via the min size and max size annotations the replicas field
-//     is defaulted to a value which is within the (min size, max size) range so the autoscaler can take control.
+//   - If the min size and max size annotations are set, the replicas field is defaulted to the value of the min size
+//     annotation so the autoscaler can take control.
 //
 // * An existing MD which initially wasn't controlled by the autoscaler should be later controlled by the autoscaler
-//   - To adopt an existing MD users can use the default, min size and max size annotations to enable the autoscaler
-//     and to ensure the replicas field is within the (min size, max size) range. Without the annotations handing over
-//     control to the autoscaler by unsetting the replicas field would lead to the field being set to 1. This is very
-//     disruptive for existing Machines and if 1 is outside the (min size, max size) range the autoscaler won't take
-//     control.
-//
-// Notes:
-//   - While the min size and max size annotations of the autoscaler provide the best UX, other autoscalers can use the
-//     DefaultReplicasAnnotation if they have similar use cases.
+//   - To adopt an existing MD users can use the min size and max size annotations to enable the autoscaler
+//     and to ensure the replicas field is within the (min size, max size) range. Without defaulting based on the annotations, handing over
+//     control to the autoscaler by unsetting the replicas field would lead to the field being set to 1. This could be
+//     very disruptive if the previous value of the replica field is greater than 1.
 func calculateMachineDeploymentReplicas(ctx context.Context, oldMD *clusterv1.MachineDeployment, newMD *clusterv1.MachineDeployment, dryRun bool) (int32, error) {
 	// If replicas is already set => Keep the current value.
 	if newMD.Spec.Replicas != nil {
